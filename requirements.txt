@@ -1,3 +1,4 @@
+streamlit
 groq
 langchain
 langchain-core
@@ -5,10 +6,4 @@ langchain-groq
 langchain-pinecone
 langchain-community
 python-dotenv
-flask
-flask-cors
-flask-socketio
-gevent
-gevent-websocket
-gunicorn
 pinecone
