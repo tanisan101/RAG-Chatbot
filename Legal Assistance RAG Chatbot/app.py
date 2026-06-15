@@ -89,29 +89,30 @@ def handle_message(message):
     - If you don't know the answer, say I don't know.
     - If you need more information, ask the user.
     """
-    if user_id not in user_conversations:
-    user_conversations[user_id] = []  # store message history as a list
-
+if user_id not in user_conversations:
+        user_conversations[user_id] = []  # store message history as a list
+    
     history = user_conversations[user_id]
-
+    
     prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content=system_prompt),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
-
+    
     chain = prompt | llm
-
+    
     response = chain.invoke({
         "history": history,
         "input": user_query
     })
-
-# Save to memory manually
+    
+    # Save to memory manually
     history.append(HumanMessage(content=user_query))
     history.append(AIMessage(content=response.content))
-
+    
     emit('bot_response', {'data': response.content}, room=user_id)
+
 if __name__ == '__main__':
     socketio.run(app, debug=False)
 
