@@ -1,9 +1,6 @@
-from flask import Flask
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit, join_room, leave_room
+import streamlit as st
 import os
 from dotenv import load_dotenv
-import uuid
 from pinecone import Pinecone
 from langchain_core.prompts import (
     ChatPromptTemplate,
@@ -15,10 +12,11 @@ from langchain_groq import ChatGroq
 
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app)
-app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+st.title("⚖️ Legal Assistance Chatbot")
+
+# Initialize clients
+pc = Pinecone(api_key=os.environ.get('PINECONE_API_KEY'))
+index_name = 'sih'
 
 llm = ChatGroq(
     groq_api_key=os.environ.get("GROQ_API_KEY"),
@@ -26,71 +24,52 @@ llm = ChatGroq(
     temperature=0.1,
 )
 
-user_conversations = {}
+# Initialize chat history in session state
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-@socketio.on('connect')
-def handle_connect():
-    user_id = str(uuid.uuid4())
-    join_room(user_id)
-    emit('set_user_id', {'user_id': user_id})
-    print(f'Client connected with ID: {user_id}')
+# Display chat history
+for msg in st.session_state.messages:
+    if isinstance(msg, HumanMessage):
+        with st.chat_message("user"):
+            st.write(msg.content)
+    else:
+        with st.chat_message("assistant"):
+            st.write(msg.content)
 
-@socketio.on('join')
-def on_join(data):
-    user_id = data['user_id']
-    join_room(user_id)
-    print(f'User {user_id} joined their room')
+# Handle user input
+if user_query := st.chat_input("Ask a legal question..."):
+    # Show user message
+    with st.chat_message("user"):
+        st.write(user_query)
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print('Client disconnected')
-
-pc = Pinecone(api_key=os.environ.get('PINECONE_API_KEY'))
-index_name = 'sih'
-
-@socketio.on('user_message')
-def handle_message(message):
-    user_id = message['user_id']
-    user_query = message['data']
-
-    query = user_query
-    query = pc.inference.embed(
+    # Pinecone search
+    query_embedding = pc.inference.embed(
         "multilingual-e5-large",
-        inputs=[query],
-        parameters={
-            "input_type": "query"
-        }
+        inputs=[user_query],
+        parameters={"input_type": "query"}
     )
     index = pc.Index(index_name)
     results = index.query(
         namespace="BNS",
-        vector=query[0].values,
+        vector=query_embedding[0].values,
         top_k=2,
         include_values=False,
         include_metadata=True
     )
-    print(f'User {user_id}: {user_query}')
-    print('---------------------------------------------------------')
-    context = [
+    context = " ".join([
         results["matches"][0]["metadata"]["text"],
         results["matches"][1]["metadata"]["text"],
-    ]
-    context = " ".join(context)
-    print('Pinecone Semantic Search :-- \n', context)
+    ])
 
     system_prompt = f"""
-    You are a expert in Indian Legal System. You are here to help the user with their queries.
-    Based on the USER QUERY: {query} and the given CONTEXT : {context} , please provide a response.
+    You are an expert in the Indian Legal System. You are here to help the user with their queries.
+    Based on the USER QUERY: {user_query} and the given CONTEXT: {context}, please provide a response.
     Guidelines:
     - Keep the answer short and to the point.
     - If you don't know the answer, say I don't know.
     - If you need more information, ask the user.
     """
-
-    if user_id not in user_conversations:
-        user_conversations[user_id] = []
-
-    history = user_conversations[user_id]
 
     prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content=system_prompt),
@@ -101,14 +80,14 @@ def handle_message(message):
     chain = prompt | llm
 
     response = chain.invoke({
-        "history": history,
+        "history": st.session_state.messages,
         "input": user_query
     })
 
-    history.append(HumanMessage(content=user_query))
-    history.append(AIMessage(content=response.content))
+    # Save to history
+    st.session_state.messages.append(HumanMessage(content=user_query))
+    st.session_state.messages.append(AIMessage(content=response.content))
 
-    emit('bot_response', {'data': response.content}, room=user_id)
-
-if __name__ == '__main__':
-    socketio.run(app, debug=False)
+    # Show bot response
+    with st.chat_message("assistant"):
+        st.write(response.content)
