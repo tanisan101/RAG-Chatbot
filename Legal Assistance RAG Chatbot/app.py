@@ -20,7 +20,7 @@ index_name = 'rag-chatbot'
 
 llm = ChatGroq(
     groq_api_key=os.environ.get("GROQ_API_KEY"),
-    model_name="llama-text-embed-v2",
+    model_name="llama3-8b-8192",  # ← FIXED (this is the chat model)
     temperature=0.1,
 )
 
@@ -39,16 +39,17 @@ for msg in st.session_state.messages:
 
 # Handle user input
 if user_query := st.chat_input("Ask a legal question..."):
-    # Show user message
+
     with st.chat_message("user"):
         st.write(user_query)
 
     # Pinecone search
     query_embedding = pc.inference.embed(
-        "llama-text-embed-v2",
+        "llama-text-embed-v2",  # ← this is correct, embedding model
         inputs=[user_query],
         parameters={"input_type": "query"}
     )
+
     index = pc.Index(index_name)
     results = index.query(
         namespace="BNS",
@@ -57,6 +58,7 @@ if user_query := st.chat_input("Ask a legal question..."):
         include_values=False,
         include_metadata=True
     )
+
     context = " ".join([
         results["matches"][0]["metadata"]["text"],
         results["matches"][1]["metadata"]["text"],
@@ -84,10 +86,8 @@ if user_query := st.chat_input("Ask a legal question..."):
         "input": user_query
     })
 
-    # Save to history
     st.session_state.messages.append(HumanMessage(content=user_query))
     st.session_state.messages.append(AIMessage(content=response.content))
 
-    # Show bot response
     with st.chat_message("assistant"):
         st.write(response.content)
