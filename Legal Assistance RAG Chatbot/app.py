@@ -20,11 +20,11 @@ index_name = 'rag-chatbot'
 
 llm = ChatGroq(
     groq_api_key=os.environ.get("GROQ_API_KEY"),
-    model_name="llama3-8b-8192",  # ← FIXED (this is the chat model)
+    model_name="llama-3.1-8b-instant",  # updated model
     temperature=0.1,
 )
 
-# Initialize chat history in session state
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -45,7 +45,7 @@ if user_query := st.chat_input("Ask a legal question..."):
 
     # Pinecone search
     query_embedding = pc.inference.embed(
-        "llama-text-embed-v2",  # ← this is correct, embedding model
+        "llama-text-embed-v2",
         inputs=[user_query],
         parameters={"input_type": "query"}
     )
