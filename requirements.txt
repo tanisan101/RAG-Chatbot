@@ -9,3 +9,5 @@ python-dotenv
 flask
 flask-cors
 flask-socketio
+gevent
+gevent-websocket
