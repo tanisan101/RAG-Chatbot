@@ -1,10 +1,10 @@
 streamlit
-groq==0.4.2
-langchain==0.0.352
-langchain-core==0.1.4
-langchain-groq==0.1.1
-langchain-community==0.0.20
-langchain-pinecone==0.0.3
+groq
+langchain
+langchain-core
+langchain-groq
+langchain-pinecone
+langchain-community
 python-dotenv
 flask
 flask-cors
