@@ -16,11 +16,11 @@ st.title("⚖️ Legal Assistance Chatbot")
 
 # Initialize clients
 pc = Pinecone(api_key=os.environ.get('PINECONE_API_KEY'))
-index_name = 'sih'
+index_name = 'rag-chatbot'
 
 llm = ChatGroq(
     groq_api_key=os.environ.get("GROQ_API_KEY"),
-    model_name="llama3-8b-8192",
+    model_name="llama-text-embed-v2",
     temperature=0.1,
 )
 
@@ -45,7 +45,7 @@ if user_query := st.chat_input("Ask a legal question..."):
 
     # Pinecone search
     query_embedding = pc.inference.embed(
-        "multilingual-e5-large",
+        "llama-text-embed-v2",
         inputs=[user_query],
         parameters={"input_type": "query"}
     )
