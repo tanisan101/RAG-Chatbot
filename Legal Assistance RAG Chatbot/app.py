@@ -5,17 +5,16 @@ import os
 from dotenv import load_dotenv
 import uuid
 from pinecone import Pinecone
-from langchain.chains import ConversationChain
-from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import (
     ChatPromptTemplate,
     HumanMessagePromptTemplate,
     MessagesPlaceholder,
 )
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_groq import ChatGroq
 
 load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
 app.config['SECRET_KEY'] = 'secret!'
@@ -26,6 +25,7 @@ llm = ChatGroq(
     model_name="llama3-8b-8192",
     temperature=0.1,
 )
+
 user_conversations = {}
 
 @socketio.on('connect')
@@ -48,14 +48,12 @@ def handle_disconnect():
 pc = Pinecone(api_key=os.environ.get('PINECONE_API_KEY'))
 index_name = 'sih'
 
-
 @socketio.on('user_message')
 def handle_message(message):
     user_id = message['user_id']
     user_query = message['data']
-    
-    query = user_query
 
+    query = user_query
     query = pc.inference.embed(
         "multilingual-e5-large",
         inputs=[query],
@@ -64,12 +62,13 @@ def handle_message(message):
         }
     )
     index = pc.Index(index_name)
-    results = index.query(namespace="BNS", 
-                        vector=query[0].values, 
-                        top_k=2, 
-                        include_values=False, 
-                        include_metadata=True )
-
+    results = index.query(
+        namespace="BNS",
+        vector=query[0].values,
+        top_k=2,
+        include_values=False,
+        include_metadata=True
+    )
     print(f'User {user_id}: {user_query}')
     print('---------------------------------------------------------')
     context = [
@@ -77,43 +76,39 @@ def handle_message(message):
         results["matches"][1]["metadata"]["text"],
     ]
     context = " ".join(context)
-    print('Pinecone Semantic Search :-- \n',context)
+    print('Pinecone Semantic Search :-- \n', context)
 
-    
     system_prompt = f"""
     You are a expert in Indian Legal System. You are here to help the user with their queries.
     Based on the USER QUERY: {query} and the given CONTEXT : {context} , please provide a response.
-
-    Guidlines:
+    Guidelines:
     - Keep the answer short and to the point.
     - If you don't know the answer, say I don't know.
     - If you need more information, ask the user.
     """
-if user_id not in user_conversations:
-        user_conversations[user_id] = []  # store message history as a list
-    
+
+    if user_id not in user_conversations:
+        user_conversations[user_id] = []
+
     history = user_conversations[user_id]
-    
+
     prompt = ChatPromptTemplate.from_messages([
         SystemMessage(content=system_prompt),
         MessagesPlaceholder(variable_name="history"),
         HumanMessagePromptTemplate.from_template("{input}")
     ])
-    
+
     chain = prompt | llm
-    
+
     response = chain.invoke({
         "history": history,
         "input": user_query
     })
-    
-    # Save to memory manually
+
     history.append(HumanMessage(content=user_query))
     history.append(AIMessage(content=response.content))
-    
+
     emit('bot_response', {'data': response.content}, room=user_id)
 
 if __name__ == '__main__':
     socketio.run(app, debug=False)
-
-    
