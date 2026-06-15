@@ -4,6 +4,7 @@ langchain
 langchain-core
 langchain-groq
 langchain-pinecone
+langchain-community
 python-dotenv
 flask
 flask-cors
